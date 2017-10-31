@@ -14,7 +14,7 @@ from openpyxl import worksheet
 from openpyxl import load_workbook
 from openpyxl import Workbook
 
-
+from django.http import StreamingHttpResponse
 # Create your views here.
 
 def index(request):
@@ -32,12 +32,12 @@ def index(request):
     
     r = requests.Session()
     f = r.get(root_url,headers = header)
-    '''
+    
     r.cookies = requests.utils.cookiejar_from_dict({
         
-        'zentaosid':'buppolukrhfdeefbce93rjigc7'})
+        'zentaosid':'r93mjbi8q4psuj2bkl49om6qg2'})
     r.post(root_url,
-        cookies = r.cookies,        
+        cookies = r.cookies,      
         headers = header
         )
     '''
@@ -49,22 +49,21 @@ def index(request):
         root_url,
         data = postdata,
         headers = header)
-    
+    '''
 
 #抓取数据部分
 
-  
+
 
     f = r.get(index_url,headers = header)
 
     soup = BeautifulSoup(f.content,'lxml')
 
     plans = soup.find_all('tr',class_='text-center')
-
+    
     names = []
     times = []
     jindus = []
-
     for plan in plans:
         l = list(plan.stripped_strings)
         if l[2] == '进行中':
@@ -73,15 +72,43 @@ def index(request):
             times.append(l[3])
             jindus.append(l[-1])
             print l[1],status,l[3],l[-1],'\n'
+    
     context = {
         'names1':names[0],'status':status,'jindus1':jindus[0],
         'names2':names[1],'status':status,'jindus2':jindus[1],
-        'names3':names[2],'status':status,'jindus3':jindus[2]
-        } 
 
+        }
+    wb = load_workbook("zhoubao.xlsx")
     
+    ws = wb.active
+    ws['B22'] = names[0]
+    ws['B23'] = names[1]
+
+    ws['E22'] = status + jindus[0]
+    ws['E23'] = status + jindus[1]
+
+    wb.save('zhoubao.xlsx')
+    return render(request,'weekly_report/index.html',context)
 
 
+def downloadFile(request):
+    filename = 'zhoubao.xlsx'
+    def file_iterator(filename, chunk_size=512):
+        with open(filename) as f:
+          while True:
+            c = f.read(chunk_size)
+            if c:
+              yield c
+            else:
+              break
+    response = StreamingHttpResponse(file_iterator(filename))
+    response['Content-Type'] = 'application/octet-stream'
+    response['Content-Disposition'] = 'attachment;filename="{0}"'.format(filename)
+    return response
+
+
+
+#这是一个解决openpyxl打开表格部分边框缺失的一个补丁
 def patch_worksheet():
     """This monkeypatches Worksheet.merge_cells to remove cell deletion bug
     https://bitbucket.org/openpyxl/openpyxl/issues/365/styling-merged-cells-isnt-working
@@ -131,13 +158,4 @@ def patch_worksheet():
 
 
 patch_worksheet()
-
-
-
-    wb = load_workbook("项目周报.xlsx")
-    ws = wb.active
-    wb.save('项目周报.xlsx')
-    return render(request,'weekly_report/index.html',context)
-
-
 

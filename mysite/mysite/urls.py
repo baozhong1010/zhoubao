@@ -17,6 +17,6 @@ from django.conf.urls import include,url
 from django.contrib import admin
 
 urlpatterns = [
-    url(r'^$',include('weekly_report.urls')),
+    url(r'^weekly_report/',include('weekly_report.urls')),
     url(r'^admin/', admin.site.urls),
 ]
