@@ -17,20 +17,21 @@ from openpyxl import Workbook
 from django.http import StreamingHttpResponse
 # Create your views here.
 
-def index(request):
-   
-#登录部分
 
+
+def get_data():
+
+#登录部分
     root_url = 'http://172.16.203.12/zentao/user-login.html'
     index_url = 'http://172.16.203.12/zentao/project-task-206.html'
+    r = requests.Session()
     UA = "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36"
 
     header = {"User-Agent": UA,
                "referer":"http://172.16.203.12/zentao/my/"
                }
 
-    
-    r = requests.Session()
+
     f = r.get(root_url,headers = header)
     
     r.cookies = requests.utils.cookiejar_from_dict({
@@ -40,6 +41,7 @@ def index(request):
         cookies = r.cookies,      
         headers = header
         )
+
     '''
     postdata = {
         'account':'baozhong',
@@ -50,17 +52,13 @@ def index(request):
         data = postdata,
         headers = header)
     '''
-
+    
 #抓取数据部分
-
-
-
     f = r.get(index_url,headers = header)
 
     soup = BeautifulSoup(f.content,'lxml')
 
     plans = soup.find_all('tr',class_='text-center')
-    
     names = []
     times = []
     jindus = []
@@ -72,38 +70,45 @@ def index(request):
             times.append(l[3])
             jindus.append(l[-1])
             print l[1],status,l[3],l[-1],'\n'
-    
+    ret = {'names': names,'status':status,'jindus':jindus}
+    return ret
+
+data = get_data()
+names = data['names']
+jindus = data['jindus']
+status = data['status']
+
+
+def index(request):
+
     context = {
         'names1':names[0],'status':status,'jindus1':jindus[0],
         'names2':names[1],'status':status,'jindus2':jindus[1],
-
         }
-    wb = load_workbook("zhoubao.xlsx")
-    
-    ws = wb.active
-    ws['B22'] = names[0]
-    ws['B23'] = names[1]
 
-    ws['E22'] = status + jindus[0]
-    ws['E23'] = status + jindus[1]
-
-    wb.save('zhoubao.xlsx')
     return render(request,'weekly_report/index.html',context)
 
 
 def downloadFile(request):
+    wb = load_workbook("zhoubao.xlsx")
+    ws = wb.active
+    num1 = 21
+    num2 = 21
+    for i in names:
+        num1 = num1 +1
+        cell1 = 'B'+ str(num1)
+        ws[cell1] = i
+    for j in jindus:
+        num2 = num2 + 1
+        cell2 = 'E' + str(num2)
+        ws[cell2] = status + j
+
+    wb.save('zhoubao.xlsx')
     filename = 'zhoubao.xlsx'
-    def file_iterator(filename, chunk_size=512):
-        with open(filename) as f:
-          while True:
-            c = f.read(chunk_size)
-            if c:
-              yield c
-            else:
-              break
-    response = StreamingHttpResponse(file_iterator(filename))
-    response['Content-Type'] = 'application/octet-stream'
-    response['Content-Disposition'] = 'attachment;filename="{0}"'.format(filename)
+    response = HttpResponse(filename)
+    response['Content-Type'] = 'application/openxmlformats-officedocument.spreadsheetml.sheet'
+    response['Content-Disposition'] = 'attachment; filename="zhoubao.xlsx"'.format(filename)
+    response.write(open('zhoubao.xlsx', 'rb').read())
     return response
 
 
